@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profesyonel Renkli Hesap Makinesi</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600&family=JetBrains+Mono:wght@500&display=swap');
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f2f5;
+            font-family: 'Outfit', sans-serif;
+            padding: 10px;
+        }
+
+        .calculator {
+            background-color: #1e272e;
+            padding: 15px;
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            /* 1:1.75 Efektif Oran Uygulaması */
+            height: 95vh;
+            width: auto;
+            aspect-ratio: 1 / 1.75;
+            max-width: 98vw;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .display-container {
+            background-color: #000;
+            border-radius: 12px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            position: relative;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        #display {
+            width: 100%;
+            height: 55px;
+            background: transparent;
+            color: #00ff00;
+            text-align: right;
+            font-size: 28px;
+            font-family: 'JetBrains Mono', monospace;
+            border: none;
+            outline: none;
+        }
+
+        #calc-preview {
+            position: absolute;
+            top: 5px;
+            left: 12px;
+            color: #ffff00; /* Sarı renk */
+            font-size: 8pt; /* 8 punto */
+            font-family: 'JetBrains Mono', monospace;
+            pointer-events: none;
+        }
+
+        /* Ceza Butonu Aktif Efekti (Sadece İnce Neon Çizgi) */
+        @keyframes ceza-neon {
+            0% { box-shadow: 0 0 2px #fff; border-color: #fff; }
+            50% { box-shadow: 0 0 15px #fff, inset 0 0 6px rgba(255, 255, 255, 0.4); border-color: #fff; }
+            100% { box-shadow: 0 0 2px #fff; border-color: #fff; }
+        }
+
+        /* Görev Butonları Aktif Efekti (Beyaz Neon Çizgi) */
+        .task-active {
+            animation: ceza-neon 4s infinite ease-in-out;
+            border: 1px solid #fff !important;
+            z-index: 5;
+        }
+
+        #status-bar {
+            position: absolute;
+            bottom: 5px;
+            left: 12px;
+            right: 12px;
+            color: #ff9f43;
+            font-size: 9px;
+            white-space: nowrap;
+        }
+
+        .memory-indicator {
+            position: absolute;
+            top: 5px;
+            left: 10px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .m-tag {
+            font-size: 10px;
+            color: #ff9f43;
+            font-weight: bold;
+            visibility: hidden;
+        }
+
+        .buttons {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            /* Satırların dikeyde esnemesi için grid ayarı */
+            grid-template-rows: auto auto auto 1fr auto 1fr 1fr 1fr 1fr;
+            gap: 8px;
+        }
+
+        button {
+            padding: 5px;
+            height: 100%;
+            font-size: min(18px, 2.8vh);
+            font-weight: 600;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.1s;
+            color: white;
+            box-shadow: 0 4px rgba(0,0,0,0.2);
+        }
+
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px rgba(0,0,0,0.2);
+        }
+
+        button:hover {
+            filter: brightness(1.15);
+        }
+
+        /* Tuş Renkleri - Gruplandırılmış */
+        .btn-mem { background-color: #f0932b; color: #1e272e; } /* Hafıza */
+        .btn-clr { background-color: #eb4d4b; } /* Silme */
+        .btn-spec { background-color: #686de0; } /* Özel İşlemler (kök, kare) */
+        .btn-op { background-color: #00d2d3; color: #1e272e; } /* İşlem Tuşları (Mavi/Cyan) */
+        .btn-num { background-color: #4834d4; } /* Sayı Tuşları (Mor/Lacivert) */
+        .btn-eq { background-color: #6ab04c; grid-column: span 2; } /* Eşittir */
+
+        /* Neon Ayırıcı Çizgi */
+        .neon-line {
+            grid-column: span 4;
+            height: 2px;
+            background: #00d2d3;
+            box-shadow: 0 0 10px #00d2d3, 0 0 20px rgba(0, 210, 211, 0.4);
+            border-radius: 2px;
+            margin: 4px 0;
+            opacity: 0.6;
+        }
+
+        /* Rakamlara özel canlı renk dokunuşları */
+        #n7 { background-color: #badc58; color: #1e272e; } /* Açık Yeşil */
+        #n8 { background-color: #6ab04c; }               /* Orta Yeşil */
+        #n9 { background-color: #218c74; }               /* Koyu Yeşil */
+        #n4 { background-color: #e056fd; }               /* Açık Mor */
+        #n5 { background-color: #be2edd; }               /* Orta Mor */
+        #n6 { background-color: #4834d4; }               /* Koyu Mor */
+        #n1 { background-color: #f9ca24; color: #1e272e; } /* Açık Sarı */
+        #n2 { background-color: #f0932b; color: #1e272e; } /* Altın/Sarı */
+        #n3 { background-color: #ffbe76; color: #1e272e; } /* Pastel Sarı */
+        #n0 { background-color: #130f40; }
+
+        /* Yıl Giriş Alanı */
+        .year-input-wrapper {
+            grid-column: span 1;
+            display: flex;
+            align-items: center;
+            background: #2d3436;
+            border-radius: 15px;
+            padding: 0 8px;
+        }
+        #ceza-yil {
+            background: transparent;
+            border: none;
+            color: #ff9f43;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: bold;
+            width: 100%;
+            text-align: center;
+            outline: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="calculator">
+    <div class="display-container">
+        <div id="calc-preview"></div>
+        <div class="memory-indicator">
+            <span id="m2-tag" class="m-tag">M2</span>
+        </div>
+        <input type="text" id="display" value="0" readonly>
+        <div id="status-bar"></div>
+    </div>
+    
+    <div class="buttons">
+        <!-- Büyük Ova Seçeneği -->
+        <div style="grid-column: span 4; background: #2d3436; border-radius: 12px; padding: 8px 15px; display: flex; align-items: center; justify-content: flex-start; gap: 10px; border: 1px solid #444; margin-bottom: 5px;">
+            <input type="checkbox" id="is-buyuk-ova" onchange="recalculateActiveTask()" style="width: 18px; height: 18px; cursor: pointer; accent-color: #ff4757;">
+            <label for="is-buyuk-ova" style="color: #ff9f43; font-size: 12px; font-weight: bold; cursor: pointer; user-select: none;">Büyük Ova İçi (2 Kat Uygula)</label>
+        </div>
+
+        <button id="btn-ceza" class="btn-mem" onclick="calculateCeza()" style="font-size: 13px;">Ceza</button>
+        <button id="btn-etut" class="btn-mem" onclick="calculateEtut()" style="font-size: 13px;">Etüt 🏠</button>
+        <button id="btn-hayvan" class="btn-mem" onclick="calculateHayvanEtut()" style="font-size: 13px;">Etüt 🚜</button>
+        <div class="year-input-wrapper">
+            <select id="ceza-yil" onchange="recalculateActiveTask()"></select>
+        </div>
+
+        <div class="neon-line"></div>
+
+        <button class="btn-clr" onclick="backspace()">DEL</button>
+        <button class="btn-clr" onclick="clearAll()">C</button>
+        <button class="btn-spec" onclick="specCalc('pct')">%</button>
+        <button class="btn-op" onclick="appendOp('/')">÷</button>
+
+        <div class="neon-line"></div>
+
+        <button class="btn-num" id="n7" onclick="appendNum('7')">7</button>
+        <button class="btn-num" id="n8" onclick="appendNum('8')">8</button>
+        <button class="btn-num" id="n9" onclick="appendNum('9')">9</button>
+        <button class="btn-op" onclick="appendOp('*')">×</button>
+
+        <button class="btn-num" id="n4" onclick="appendNum('4')">4</button>
+        <button class="btn-num" id="n5" onclick="appendNum('5')">5</button>
+        <button class="btn-num" id="n6" onclick="appendNum('6')">6</button>
+        <button class="btn-op" onclick="appendOp('-')">-</button>
+
+        <button class="btn-num" id="n1" onclick="appendNum('1')">1</button>
+        <button class="btn-num" id="n2" onclick="appendNum('2')">2</button>
+        <button class="btn-num" id="n3" onclick="appendNum('3')">3</button>
+        <button class="btn-op" onclick="appendOp('+')">+</button>
+
+        <button class="btn-num" id="n0" onclick="appendNum('0')">0</button>
+        <button class="btn-num" onclick="appendNum('.')">,</button>
+        <button class="btn-eq" onclick="calculate()">=</button>
+    </div>
+</div>
+
+<script>
+    let current = '0';
+    let memory = { M1: null, M2: null };
+    let activeTask = null; // Hangi görev tuşunun aktif olduğunu tutar
+    let lastInputValue = null; // Kullanıcının yazdığı ham sayıyı aklında tutar
+    let shouldReset = false;
+
+    // Yıllara göre çarpan değerleri
+    let cezaRates = {
+        "2020": 10.00,
+        "2021": 10.91,
+        "2022": 14.86,
+        "2023": 33.13,
+        "2024": 52.50,
+        "2025": 75.56,
+        "2026": 94.82,
+        "2027": 0.00,
+        "2028": 0.00,
+        "2029": 0.00,
+        "2030": 0.00,
+        "2031": 0.00,
+        "2032": 0.00,
+        "2033": 0.00,
+        "2034": 0.00,
+        "2035": 0.00,
+        "2036": 0.00,
+        "2037": 0.00,
+        "2038": 0.00,
+        "2039": 0.00,
+        "2040": 0.00
+    };
+
+    // Etüt (🏠) Yıllık Katsayıları
+    let etutRates = {
+        "2020": { base: 0.00, extra: 0.00 },
+        "2021": { base: 0.00, extra: 0.00 },
+        "2022": { base: 0.00, extra: 0.00 },
+        "2023": { base: 0.00, extra: 0.00 },
+        "2024": { base: 0.00, extra: 0.00 },
+        "2025": { base: 0.00, extra: 0.00 },
+        "2026": { base: 7200, extra: 2800 },
+        "2027": { base: 0.00, extra: 0.00 },
+        "2028": { base: 0.00, extra: 0.00 },
+        "2029": { base: 0.00, extra: 0.00 },
+        "2030": { base: 0.00, extra: 0.00 },
+        "2031": { base: 0.00, extra: 0.00 },
+        "2032": { base: 0.00, extra: 0.00 },
+        "2033": { base: 0.00, extra: 0.00 },
+        "2034": { base: 0.00, extra: 0.00 },
+        "2035": { base: 0.00, extra: 0.00 },
+        "2036": { base: 0.00, extra: 0.00 },
+        "2037": { base: 0.00, extra: 0.00 },
+        "2038": { base: 0.00, extra: 0.00 },
+        "2039": { base: 0.00, extra: 0.00 },
+        "2040": { base: 0.00, extra: 0.00 }
+    };
+
+    // Etüt (🚜) Yıllık Katsayıları
+    let hayvanRates = {
+        "2020": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2021": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2022": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2023": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2024": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2025": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2026": { low: 1400, mid: 3000, extra: 1400 },
+        "2027": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2028": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2029": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2030": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2031": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2032": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2033": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2034": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2035": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2036": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2037": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2038": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2039": { low: 0.00, mid: 0.00, extra: 0.00 },
+        "2040": { low: 0.00, mid: 0.00, extra: 0.00 }
+    };
+
+    // Yıl listesini otomatik doldur ve güncel yılı seç
+    const yilSelect = document.getElementById('ceza-yil');
+    const currentYear = new Date().getFullYear();
+    for (let i = 2020; i <= 2040; i++) {
+        let opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = i;
+        if (i === currentYear) opt.selected = true;
+        yilSelect.appendChild(opt);
+    }
+
+    const display = document.getElementById('display');
+
+    function clearTaskStyles() {
+        document.getElementById('btn-ceza').classList.remove('task-active'); 
+        document.getElementById('btn-etut').classList.remove('task-active');
+        document.getElementById('btn-hayvan').classList.remove('task-active');
+    }
+
+    function clearActiveTask() {
+        activeTask = null;
+        clearTaskStyles();
+        document.getElementById('calc-preview').textContent = '';
+    }
+
+    function update() {
+        let parts = current.split('.');
+        // Binlik ayırıcıyı nokta (.) olarak ekle
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        // Parçaları virgül (,) ile birleştir
+        display.value = parts.join(',');
+    }
+
+    function appendNum(n) {
+        if (current === '0' || shouldReset) {
+            if (shouldReset) clearActiveTask();
+            current = n;
+            shouldReset = false;
+        } else {
+            if (current.replace(/[^0-9]/g, '').length < 12) {
+                if (n === '.' && current.includes('.')) return;
+                current += n;
+            }
+        }
+        update();
+    }
+
+    function appendOp(op) {
+        if (shouldReset) {
+            clearActiveTask();
+            shouldReset = false;
+        }
+        const last = current.slice(-1);
+        if (['+', '-', '*', '/'].includes(last)) current = current.slice(0, -1) + op;
+        else current += op;
+        update();
+    }
+
+    function clearAll() { current = '0'; lastInputValue = null; clearActiveTask(); update(); }
+    function backspace() { 
+        if (shouldReset) clearActiveTask();
+        current = current.length > 1 ? current.slice(0, -1) : '0'; update(); 
+    }
+
+    // Hesaplama Yardımcısı: Hataları önlemek için sonu operatörle biten girişleri temizler
+    function getSafeValue() {
+        let temp = current.replace(/×/g, '*').replace(/÷/g, '/');
+        // Eğer giriş "+", "-", "*", "/" ile bitiyorsa o karakteri görmezden gel
+        temp = temp.replace(/[+\-*/]*$/, '');
+        try {
+            return eval(temp) || 0;
+        } catch {
+            return 0;
+        }
+    }
+
+    function formatResult(num) {
+        return Number(num).toFixed(4);
+    }
+
+    function calculate() {
+        try {
+            let res = getSafeValue();
+            document.getElementById('calc-preview').textContent = current.replace(/\*/g, '×').replace(/\//g, '÷');
+            current = formatResult(res);
+            clearActiveTask();
+            shouldReset = true;
+            update();
+        } catch { current = 'Hata'; update(); setTimeout(clearAll, 1000); }
+    }
+
+    function specCalc(type) {
+        let val = getSafeValue();
+        if (type === 'sqrt') val = Math.sqrt(val);
+        if (type === 'sq') val = Math.pow(val, 2);
+        if (type === 'pct') val = val / 100;
+        current = formatResult(val);
+        clearActiveTask();
+        shouldReset = true;
+        update();
+    }
+
+    function calculateCeza(isRecalc = false) {
+        try {
+            clearTaskStyles();
+            // Eğer ekranda bir sonuç varken tekrar basılırsa veya yıl değişirse hafızadaki sayıyı kullan
+            let val = (isRecalc || (shouldReset && activeTask)) ? lastInputValue : getSafeValue();
+            lastInputValue = val;
+
+            let message = "";
+            const yil = document.getElementById('ceza-yil').value;
+            
+            // Yıl için çarpan kontrolü
+            if (!cezaRates[yil]) {
+                let inputRate = prompt(`${yil} yılı için çarpan değeri bulunamadı. Lütfen yeni değeri giriniz (Örn: 94.82):`);
+                if (inputRate) {
+                    cezaRates[yil] = parseFloat(inputRate.replace(',', '.'));
+                } else {
+                    return; // İptal edilirse işlem yapma
+                }
+            }
+
+            const rate = cezaRates[yil];
+            const isBuyukOva = document.getElementById('is-buyuk-ova').checked;
+            const multiplier = isBuyukOva ? 2 : 1;
+            let res = 0;
+
+            if (val < 100) {
+                res = (100 * rate) * multiplier;
+                document.getElementById('calc-preview').textContent = `(100 × ${rate})${isBuyukOva ? ' × 2' : ''}`;
+                message = "ceza hesaplandı. alan 100 m2 den küçük olduğu için 100 m2 ye tamamlandı.";
+            } else {
+                res = (val * rate) * multiplier;
+                document.getElementById('calc-preview').textContent = `(${val} × ${rate})${isBuyukOva ? ' × 2' : ''}`;
+            }
+            
+            current = formatResult(res);
+            activeTask = 'ceza'; 
+            shouldReset = true;
+            
+            // Ceza Özel Formatı: 2 ondalık hane, binlik ayırıcı ve TL ibaresi
+            let parts = res.toFixed(2).split('.');
+            // Binlik ayırıcı ekle
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+            display.value = parts.join(',') + " TL";
+            activeTask = 'ceza'; 
+            document.getElementById('btn-ceza').classList.add('task-active'); // Buton efektini başlat
+
+            const bar = document.getElementById('status-bar');
+            if (message) {
+                bar.textContent = message;
+                setTimeout(() => { bar.textContent = ""; }, 6000);
+            } else {
+                bar.textContent = "";
+            }
+        } catch { current = 'Hata'; update(); setTimeout(clearAll, 1000); }
+    }
+
+    function calculateEtut(isRecalc = false) {
+        try {
+            clearTaskStyles();
+            let val = (isRecalc || (shouldReset && activeTask)) ? lastInputValue : getSafeValue();
+            lastInputValue = val;
+            const yil = document.getElementById('ceza-yil').value;
+
+            // Yıla göre katsayıları al, yoksa varsayılanları kullan
+            let rates = etutRates[yil] || { base: 7200, extra: 2800 };
+
+            if (rates.base === 0 && rates.extra === 0) {
+                alert(`${yil} yılı için Etüt (Bina) katsayıları henüz tanımlanmamış!`);
+                return;
+            }
+
+            let res = rates.base;
+
+            if (val > 10000) {
+                // 10000'den büyükse her 10000'lik fazla blok için 2800 ekle
+                let extraBlocks = Math.ceil((val - 10000) / 10000);
+                res += extraBlocks * rates.extra;
+                document.getElementById('calc-preview').textContent = `${rates.base} + (${extraBlocks} × ${rates.extra})`;
+            } else {
+                document.getElementById('calc-preview').textContent = `${rates.base} (Sabit)`;
+            }
+
+            current = formatResult(res);
+            activeTask = 'etut';
+            shouldReset = true;
+
+            // Formatlama: 2 ondalık hane, binlik ayırıcı ve TL
+            let parts = res.toFixed(2).split('.');
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+            display.value = parts.join(',') + " TL";
+            
+            document.getElementById('btn-etut').classList.add('task-active');
+        } catch { current = 'Hata'; update(); setTimeout(clearAll, 1000); }
+    }
+
+    function calculateHayvanEtut(isRecalc = false) {
+        try {
+            clearTaskStyles();
+            let val = (isRecalc || (shouldReset && activeTask)) ? lastInputValue : getSafeValue();
+            lastInputValue = val;
+            const yil = document.getElementById('ceza-yil').value;
+
+            // Yıla göre katsayıları al, yoksa varsayılanları kullan
+            let rates = hayvanRates[yil] || { low: 1400, mid: 3000, extra: 1400 };
+
+            if (rates.low === 0 && rates.mid === 0 && rates.extra === 0) {
+                alert(`${yil} yılı için Etüt (Traktör) katsayıları henüz tanımlanmamış!`);
+                return;
+            }
+
+            let res = 0;
+
+            if (val <= 500) {
+                res = rates.low;
+                document.getElementById('calc-preview').textContent = `${rates.low} (Sabit)`;
+            } else if (val <= 10000) {
+                res = rates.mid;
+                document.getElementById('calc-preview').textContent = `${rates.mid} (Sabit)`;
+            } else {
+                // 10000'den büyükse 3000 taban + her 10000'lik blok için 1400
+                let extraBlocks = Math.ceil((val - 10000) / 10000);
+                res = rates.mid + (extraBlocks * rates.extra);
+                document.getElementById('calc-preview').textContent = `${rates.mid} + (${extraBlocks} × ${rates.extra})`;
+            }
+
+            current = formatResult(res);
+            activeTask = 'hayvan';
+            shouldReset = true;
+
+            // Formatlama: 2 ondalık hane, binlik ayırıcı ve TL
+            let parts = res.toFixed(2).split('.');
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+            display.value = parts.join(',') + " TL";
+            
+            document.getElementById('btn-hayvan').classList.add('task-active');
+            
+            const bar = document.getElementById('status-bar');
+            bar.textContent = "hayvancılık etüt hesabı yapıldı.";
+            setTimeout(() => { bar.textContent = ""; }, 4000);
+        } catch { current = 'Hata'; update(); setTimeout(clearAll, 1000); }
+    }
+
+    function recalculateActiveTask() {
+        if (!activeTask) return;
+        if (activeTask === 'ceza') calculateCeza(true);
+        else if (activeTask === 'etut') calculateEtut(true);
+        else if (activeTask === 'hayvan') calculateHayvanEtut(true);
+    }
+
+    function copyToClipboard() {
+        let val = display.value;
+        navigator.clipboard.writeText(val).then(() => {
+            const bar = document.getElementById('status-bar');
+            const originalText = bar.textContent;
+            bar.textContent = "Sonuç kopyalandı!";
+            setTimeout(() => { bar.textContent = originalText; }, 2000);
+        });
+    }
+
+    function memHandle(id) {
+        if (current !== '0' && !shouldReset) {
+            memory[id] = current;
+            document.getElementById(id.toLowerCase() + '-tag').style.visibility = 'visible';
+            shouldReset = true;
+        } else if (memory[id] !== null) {
+            current = memory[id];
+            shouldReset = false;
+            update();
+        }
+    }
+
+    // Klavye Desteği
+    window.addEventListener('keydown', (e) => {
+        // Kopyalama (Ctrl + C)
+        if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+            copyToClipboard();
+        }
+        
+        // Rakamlar ve Ondalık Ayırıcı
+        if (e.key >= '0' && e.key <= '9') appendNum(e.key);
+        if (e.key === '.' || e.key === ',') appendNum('.');
+        
+        // İşlemler
+        if (['+', '-', '*', '/'].includes(e.key)) appendOp(e.key);
+        if (e.key === 'Enter' || e.key === '=') { e.preventDefault(); calculate(); }
+        if (e.key === 'Backspace') backspace();
+        if (e.key === 'Escape' || (e.key.toLowerCase() === 'c' && !e.ctrlKey)) clearAll();
+        if (e.key === '%') specCalc('pct');
+    });
+</script>
+
+</body>
+</html>
